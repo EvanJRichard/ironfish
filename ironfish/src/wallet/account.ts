@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import MurmurHash3 from 'imurmurhash'
 import { Assert } from '../assert'
 import { Transaction } from '../primitives'
@@ -130,10 +131,13 @@ export class Account {
         const value = note.note.value()
         const currentUnconfirmedBalance = await this.walletDb.getUnconfirmedBalance(this, tx)
 
-        if (note.spent) {
-          await this.saveUnconfirmedBalance(currentUnconfirmedBalance - value, tx)
-        } else {
-          await this.saveUnconfirmedBalance(currentUnconfirmedBalance + value, tx)
+        // TODO: we're skipping non-native assets in balance for now
+        if (note.note.assetIdentifier().equals(Asset.nativeIdentifier())) {
+          if (note.spent) {
+            await this.saveUnconfirmedBalance(currentUnconfirmedBalance - value, tx)
+          } else {
+            await this.saveUnconfirmedBalance(currentUnconfirmedBalance + value, tx)
+          }
         }
       }
 
@@ -393,6 +397,10 @@ export class Account {
 
     let unconfirmed = pending
     for await (const note of this.walletDb.loadNotesNotOnChain(this, tx)) {
+      // TODO: Skip all non-native assets for now
+      if (!note.note.assetIdentifier().equals(Asset.nativeIdentifier())) {
+        continue
+      }
       if (!note.spent) {
         pendingCount++
         unconfirmed -= note.note.value()
@@ -414,6 +422,10 @@ export class Account {
         unconfirmedSequenceEnd,
         tx,
       )) {
+        // TODO: Skip all non-native assets for now
+        if (!note.note.assetIdentifier().equals(Asset.nativeIdentifier())) {
+          continue
+        }
         if (!note.spent) {
           unconfirmedCount++
           confirmed -= note.note.value()

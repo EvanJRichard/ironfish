@@ -838,4 +838,128 @@ describe('Accounts', () => {
       pending: BigInt(2),
     })
   })
+
+  it('test basic multi-asset transactions', async () => {
+    // Initialize the database and chain
+    const node = nodeTest.node
+    const chain = nodeTest.chain
+
+    const account = await node.wallet.createAccount('test', true)
+    const accountB = await node.wallet.createAccount('other account', true)
+    await node.wallet.updateHead()
+
+    const asset = new Asset(account.spendingKey, 'cool-asset', 'some metadata')
+    const mintValue = BigInt(10)
+    const burnValue = BigInt(5)
+
+    // Initial balance should be 0
+    // await expect(node.wallet.getBalance(account)).resolves.toMatchObject({ })
+    // await node.wallet.updateHead()
+
+    // Create a block with a miner's fee
+    const minersfee = await nodeTest.strategy.createMinersFee(BigInt(0), 2, account.spendingKey)
+    const blockA = await chain.newBlock([], minersfee)
+    const addResult = await chain.addBlock(blockA)
+    expect(addResult.isAdded).toBeTruthy()
+    await node.wallet.updateHead()
+
+    // Other block code
+    const blockB = await useBlockFixture(
+      chain,
+      async () => {
+        const transaction = await node.wallet.createTransaction(
+          account,
+          // send other account 2 tokens of the native asset
+          [
+            {
+              publicAddress: accountB.publicAddress,
+              amount: BigInt(2),
+              memo: '',
+              assetIdentifier: Asset.nativeIdentifier(),
+            },
+          ],
+          // mint custom asset
+          [{ asset, value: mintValue }],
+          [],
+          BigInt(0),
+          0,
+        )
+
+        // Create block
+        return chain.newBlock(
+          [transaction],
+          await node.strategy.createMinersFee(BigInt(0), 3, generateKey().spending_key),
+        )
+      },
+      node.wallet,
+    )
+    await expect(chain).toAddBlock(blockB)
+
+    await node.wallet.updateHead()
+
+    await expect(node.wallet.getBalance(account)).resolves.toMatchObject({
+      confirmed: BigInt(1999999998),
+      pending: BigInt(1999999998),
+    })
+
+    const blockC = await useBlockFixture(
+      chain,
+      async () => {
+        const transaction = await node.wallet.createTransaction(
+          account,
+          [],
+          [],
+          // burn custom asset
+          [{ asset, value: burnValue }],
+          BigInt(0),
+          0,
+        )
+
+        // Create block
+        return chain.newBlock(
+          [transaction],
+          await node.strategy.createMinersFee(BigInt(0), 4, generateKey().spending_key),
+        )
+      },
+      node.wallet,
+    )
+    await expect(chain).toAddBlock(blockC)
+
+    await node.wallet.updateHead()
+
+    await expect(node.wallet.getBalance(account)).resolves.toMatchObject({
+      confirmed: BigInt(1999999998),
+      pending: BigInt(1999999998),
+    })
+
+    const blockD = await useBlockFixture(
+      chain,
+      async () => {
+        const transaction = await node.wallet.createTransaction(
+          account,
+          [],
+          [],
+          // burn custom asset
+          [{ asset, value: burnValue }],
+          BigInt(0),
+          0,
+        )
+
+        // Create block
+        return chain.newBlock(
+          [transaction],
+          await node.strategy.createMinersFee(BigInt(0), 5, generateKey().spending_key),
+        )
+      },
+      node.wallet,
+    )
+    await expect(chain).toAddBlock(blockD)
+
+    await node.wallet.updateHead()
+
+    await expect(node.wallet.getBalance(account)).resolves.toMatchObject({
+      confirmed: BigInt(1999999998),
+      pending: BigInt(1999999998),
+    })
+  }, 10000)
 })
