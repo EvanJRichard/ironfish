@@ -6,7 +6,7 @@ import * as yup from 'yup'
 import { ApiNamespace, router } from '../router'
 import { getAccount } from './utils'
 
-export type GetBalanceRequest = { account?: string; minimumBlockConfirmations?: number }
+export type GetBalanceRequest = { account?: string; assetIdentifier?: string, minimumBlockConfirmations?: number }
 
 export type GetBalanceResponse = {
   account: string
@@ -21,6 +21,7 @@ export type GetBalanceResponse = {
 export const GetBalanceRequestSchema: yup.ObjectSchema<GetBalanceRequest> = yup
   .object({
     account: yup.string().strip(true),
+    assetIdentifier: yup.string().optional(),
   })
   .defined()
 
@@ -46,7 +47,13 @@ router.register<typeof GetBalanceRequestSchema, GetBalanceResponse>(
     )
 
     const account = getAccount(node, request.data.account)
-    const balance = await node.wallet.getBalance(account, Asset.nativeIdentifier(), {
+
+    let assetIdentifier = Asset.nativeIdentifier()
+    if (request.data.assetIdentifier) {
+      assetIdentifier = Buffer.from(request.data.assetIdentifier, 'hex')
+    }
+
+    const balance = await node.wallet.getBalance(account, assetIdentifier, {
       minimumBlockConfirmations,
     })
 
