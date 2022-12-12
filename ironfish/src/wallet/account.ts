@@ -128,13 +128,26 @@ export class Account {
 
       if (!existingNote || existingNote.spent !== note.spent) {
         const value = note.note.value()
-        const currentUnconfirmedBalance = await this.walletDb.getUnconfirmedBalance(this, tx)
+        const assetIdentifier = note.note.assetIdentifier()
+        const currentUnconfirmedBalance = await this.walletDb.getUnconfirmedBalance(
+          this,
+          assetIdentifier,
+          tx,
+        )
         const assetIdentiifer = note.note.assetIdentifier()
 
         if (note.spent) {
-          await this.saveUnconfirmedBalance(assetIdentiifer, currentUnconfirmedBalance - value, tx)
+          await this.saveUnconfirmedBalance(
+            assetIdentiifer,
+            currentUnconfirmedBalance - value,
+            tx,
+          )
         } else {
-          await this.saveUnconfirmedBalance(assetIdentiifer, currentUnconfirmedBalance + value, tx)
+          await this.saveUnconfirmedBalance(
+            assetIdentiifer,
+            currentUnconfirmedBalance + value,
+            tx,
+          )
         }
       }
 
@@ -278,13 +291,25 @@ export class Account {
       if (existingNote) {
         const note = existingNote.note
         const value = note.value()
-        const currentUnconfirmedBalance = await this.walletDb.getUnconfirmedBalance(this, tx)
         const assetIdentifier = existingNote.note.assetIdentifier()
+        const currentUnconfirmedBalance = await this.walletDb.getUnconfirmedBalance(
+          this,
+          assetIdentifier,
+          tx,
+        )
 
         if (existingNote.spent) {
-          await this.saveUnconfirmedBalance(assetIdentifier, currentUnconfirmedBalance + value, tx)
+          await this.saveUnconfirmedBalance(
+            assetIdentifier,
+            currentUnconfirmedBalance + value,
+            tx,
+          )
         } else {
-          await this.saveUnconfirmedBalance(assetIdentifier, currentUnconfirmedBalance - value, tx)
+          await this.saveUnconfirmedBalance(
+            assetIdentifier,
+            currentUnconfirmedBalance - value,
+            tx,
+          )
         }
 
         await this.walletDb.deleteDecryptedNote(this, noteHash, tx)
@@ -379,6 +404,7 @@ export class Account {
    */
   async getBalance(
     headSequence: number,
+    assetIdentifier: Buffer,
     minimumBlockConfirmations: number,
     tx?: IDatabaseTransaction,
   ): Promise<{
@@ -391,7 +417,7 @@ export class Account {
     let pendingCount = 0
     let unconfirmedCount = 0
 
-    const pending = await this.getUnconfirmedBalance(tx)
+    const pending = await this.getUnconfirmedBalance(assetIdentifier, tx)
 
     let unconfirmed = pending
     for await (const note of this.walletDb.loadNotesNotOnChain(this, tx)) {
@@ -440,8 +466,11 @@ export class Account {
     }
   }
 
-  async getUnconfirmedBalance(tx?: IDatabaseTransaction): Promise<bigint> {
-    return this.walletDb.getUnconfirmedBalance(this, tx)
+  async getUnconfirmedBalance(
+    assetIdentifier: Buffer,
+    tx?: IDatabaseTransaction,
+  ): Promise<bigint> {
+    return this.walletDb.getUnconfirmedBalance(this, assetIdentifier, tx)
   }
 
   private async saveUnconfirmedBalance(

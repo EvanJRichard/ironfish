@@ -530,13 +530,13 @@ export class WalletDB {
     }
   }
 
-  async getUnconfirmedBalance(account: Account, tx?: IDatabaseTransaction): Promise<bigint> {
-    const unconfirmedBalance = await this.balances.get(
-      [account.prefix, Asset.nativeIdentifier()],
-      tx,
-    )
-    Assert.isNotUndefined(unconfirmedBalance)
-    return unconfirmedBalance
+  async getUnconfirmedBalance(
+    account: Account,
+    assetIdentifier: Buffer,
+    tx?: IDatabaseTransaction,
+  ): Promise<bigint> {
+    const unconfirmedBalance = await this.balances.get([account.prefix, assetIdentifier], tx)
+    return unconfirmedBalance ?? BigInt(0)
   }
 
   async saveUnconfirmedBalance(
@@ -545,7 +545,7 @@ export class WalletDB {
     balance: bigint,
     tx?: IDatabaseTransaction,
   ): Promise<void> {
-    await this.balances.put([account.prefix, Asset.nativeIdentifier()], balance, tx)
+    await this.balances.put([account.prefix, assetIdentifier], balance, tx)
   }
 
   async clearBalance(account: Account, tx?: IDatabaseTransaction): Promise<void> {

@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import * as yup from 'yup'
 import { ApiNamespace, router } from '../router'
 import { getAccount } from './utils'
@@ -45,7 +46,9 @@ router.register<typeof GetBalanceRequestSchema, GetBalanceResponse>(
     )
 
     const account = getAccount(node, request.data.account)
-    const balance = await node.wallet.getBalance(account, { minimumBlockConfirmations })
+    const balance = await node.wallet.getBalance(account, Asset.nativeIdentifier(), {
+      minimumBlockConfirmations,
+    })
 
     request.end({
       account: account.name,

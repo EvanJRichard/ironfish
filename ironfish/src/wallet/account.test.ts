@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import { Assert } from '../assert'
 import {
   createNodeTest,
@@ -113,7 +114,7 @@ describe('Accounts', () => {
       AsyncUtils.materialize(node.wallet.walletDb.loadNoteHashesNotOnChain(account)),
     ).resolves.toHaveLength(1)
 
-    await expect(account.getBalance(1, 1)).resolves.toMatchObject({
+    await expect(account.getBalance(1, Asset.nativeIdentifier(), 1)).resolves.toMatchObject({
       confirmed: BigInt(0),
       pending: BigInt(2000000000),
     })
@@ -126,7 +127,7 @@ describe('Accounts', () => {
       AsyncUtils.materialize(node.wallet.walletDb.loadNoteHashesNotOnChain(account)),
     ).resolves.toHaveLength(0)
 
-    await expect(account.getBalance(1, 1)).resolves.toMatchObject({
+    await expect(account.getBalance(1, Asset.nativeIdentifier(), 1)).resolves.toMatchObject({
       confirmed: BigInt(0),
       pending: BigInt(0),
     })

@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import * as yup from 'yup'
 import { ValidationError } from '../../adapters'
 import { ApiNamespace, router } from '../router'
@@ -39,7 +40,9 @@ router.register<typeof RemoveAccountRequestSchema, RemoveAccountResponse>(
     }
 
     if (!request.data.confirm) {
-      const balance = await node.wallet.getBalance(account, { minimumBlockConfirmations: 0 })
+      const balance = await node.wallet.getBalance(account, Asset.nativeIdentifier(), {
+        minimumBlockConfirmations: 0,
+      })
 
       if (balance.unconfirmed !== BigInt(0)) {
         request.end({ needsConfirm: true })
