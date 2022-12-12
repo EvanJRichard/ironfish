@@ -435,7 +435,9 @@ describe('FeeEstimator', () => {
       await node.wallet.updateHead()
 
       // account1 should have only one note -- change from its transaction to account2
-      const account1Notes = await AsyncUtils.materialize(account1.getUnspentNotes(Asset.nativeIdentifier()))
+      const account1Notes = await AsyncUtils.materialize(
+        account1.getUnspentNotes(Asset.nativeIdentifier()),
+      )
       expect(account1Notes.length).toEqual(1)
 
       const feeEstimator = new FeeEstimator({

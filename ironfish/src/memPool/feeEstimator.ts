@@ -240,7 +240,11 @@ export class FeeEstimator {
 
     const amountNeeded = receives.reduce((acc, receive) => acc + receive.amount, BigInt(0))
 
-    const { amount, notes } = await this.wallet.createSpendsForAsset(sender, Asset.nativeIdentifier(), amountNeeded)
+    const { amount, notes } = await this.wallet.createSpendsForAsset(
+      sender,
+      Asset.nativeIdentifier(),
+      amountNeeded,
+    )
 
     size += notes.length * SPEND_SERIALIZED_SIZE_IN_BYTE
 
