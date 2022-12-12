@@ -989,6 +989,10 @@ describe('Accounts', () => {
       confirmed: BigInt(1999999998),
       pending: BigInt(1999999998),
     })
+    await expect(node.wallet.getBalance(account, asset.identifier())).resolves.toMatchObject({
+      confirmed: mintValue,
+      pending: mintValue,
+    })
 
     const blockC = await useBlockFixture(
       chain,
@@ -1021,6 +1025,10 @@ describe('Accounts', () => {
       confirmed: BigInt(1999999998),
       pending: BigInt(1999999998),
     })
+    await expect(node.wallet.getBalance(account, asset.identifier())).resolves.toMatchObject({
+      confirmed: mintValue - burnValue,
+      pending: mintValue - burnValue,
+    })
 
     const blockD = await useBlockFixture(
       chain,
@@ -1052,6 +1060,10 @@ describe('Accounts', () => {
     ).resolves.toMatchObject({
       confirmed: BigInt(1999999998),
       pending: BigInt(1999999998),
+    })
+    await expect(node.wallet.getBalance(account, asset.identifier())).resolves.toMatchObject({
+      confirmed: mintValue - burnValue - burnValue,
+      pending: mintValue - burnValue - burnValue,
     })
   }, 10000)
 })
