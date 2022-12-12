@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import { CurrencyUtils, isValidPublicAddress } from '@ironfish/sdk'
 import { CliUx, Flags } from '@oclif/core'
 import { IronfishCommand } from '../../command'
@@ -25,6 +26,10 @@ export class Pay extends IronfishCommand {
     amount: Flags.string({
       char: 'a',
       description: 'Amount of coins to send in IRON',
+    }),
+    assetIdentifier: Flags.string({
+      char: 'i',
+      description: 'Identifier for which asset to pay with',
     }),
     to: Flags.string({
       char: 't',
@@ -58,6 +63,7 @@ export class Pay extends IronfishCommand {
   async start(): Promise<void> {
     const { flags } = await this.parse(Pay)
     let amount = null
+    let assetIdentifier = Asset.nativeIdentifier().toString('hex')
     let fee = null
     let to = flags.to?.trim()
     let from = flags.account?.trim()
@@ -72,6 +78,10 @@ export class Pay extends IronfishCommand {
         `Your node must be synced with the Iron Fish network to send a transaction. Please try again later`,
       )
       this.exit(1)
+    }
+
+    if (flags.assetIdentifier) {
+      assetIdentifier = flags.assetIdentifier
     }
 
     if (flags.amount) {
@@ -226,7 +236,8 @@ ${CurrencyUtils.renderIron(amount, true)} plus a transaction fee of ${CurrencyUt
           {
             publicAddress: to,
             amount: CurrencyUtils.encode(amount),
-            memo: memo,
+            memo,
+            assetIdentifier,
           },
         ],
         fee: CurrencyUtils.encode(fee),
