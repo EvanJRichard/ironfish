@@ -89,7 +89,7 @@ export class Pay extends IronfishCommand {
     }
 
     if (amount === null) {
-      const response = await client.getAccountBalance({ account: from })
+      const response = await client.getAccountBalance({ account: from, assetIdentifier })
 
       const input = (await CliUx.ux.prompt(
         `Enter the amount in $IRON (balance: ${CurrencyUtils.renderIron(

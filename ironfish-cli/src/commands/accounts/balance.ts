@@ -27,6 +27,10 @@ export class BalanceCommand extends IronfishCommand {
       required: false,
       description: 'Minimum number of blocks confirmations for a note',
     }),
+    assetIdentifier: Flags.string({
+      char: 'i',
+      description: 'Asset identifier'
+    })
   }
 
   static args = [
@@ -46,6 +50,7 @@ export class BalanceCommand extends IronfishCommand {
 
     const response = await client.getAccountBalance({
       account,
+      assetIdentifier: flags.assetIdentifier,
       minimumBlockConfirmations: flags.confirmations,
     })
 

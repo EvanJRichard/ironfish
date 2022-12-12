@@ -5,6 +5,7 @@ use std::collections::{hash_map, HashMap};
 
 use crate::assets::asset::{AssetIdentifier, NATIVE_ASSET};
 
+#[derive(Debug)]
 pub struct ValueBalances {
     values: HashMap<AssetIdentifier, i64>,
 }

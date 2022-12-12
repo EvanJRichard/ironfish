@@ -421,8 +421,7 @@ export class Account {
 
     let unconfirmed = pending
     for await (const note of this.walletDb.loadNotesNotOnChain(this, tx)) {
-      // TODO: Skip all non-native assets for now
-      if (!note.note.assetIdentifier().equals(Asset.nativeIdentifier())) {
+      if (!note.note.assetIdentifier().equals(assetIdentifier)) {
         continue
       }
       if (!note.spent) {
@@ -446,8 +445,7 @@ export class Account {
         unconfirmedSequenceEnd,
         tx,
       )) {
-        // TODO: Skip all non-native assets for now
-        if (!note.note.assetIdentifier().equals(Asset.nativeIdentifier())) {
+        if (!note.note.assetIdentifier().equals(assetIdentifier)) {
           continue
         }
         if (!note.spent) {

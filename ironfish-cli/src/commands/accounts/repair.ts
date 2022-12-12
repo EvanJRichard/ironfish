@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+import { Asset } from '@ironfish/rust-nodejs'
 import {
   Account,
   Assert,
@@ -164,7 +165,8 @@ export default class Repair extends IronfishCommand {
     this.log(
       `\tSaving new unconfirmed balance: ${CurrencyUtils.renderIron(unconfirmedBalance, true)}`,
     )
-    await walletDb.saveUnconfirmedBalance(account, unconfirmedBalance)
+    // TODO Use a map
+    await walletDb.saveUnconfirmedBalance(account, Asset.nativeIdentifier(), unconfirmedBalance)
 
     this.log(
       `\tRepaired ${noteUnspentMismatches} decrypted notes incorrectly marked as unspent`,

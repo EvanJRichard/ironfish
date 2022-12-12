@@ -698,6 +698,24 @@ export class Wallet {
     return transaction
   }
 
+  async mint(memPool: MemPool, account: Account, name: string, metadata: string, value: number): Promise<Transaction> {
+    const heaviestHead = this.chain.head
+    if (heaviestHead === null) {
+      throw new Error('You must have a genesis block to create a transaction')
+    }
+
+    const fee = BigInt(1)
+    const asset = new Asset(account.spendingKey, name, metadata)
+    const transaction = await this.createTransaction(account, [], [{ asset, value: BigInt(value)} ], [], fee, 0)
+
+    await this.syncTransaction(transaction, { submittedSequence: heaviestHead.sequence })
+    memPool.acceptTransaction(transaction)
+    this.broadcastTransaction(transaction)
+    this.onTransactionCreated.emit(transaction)
+
+    return transaction
+  }
+
   async createTransaction(
     sender: Account,
     receives: {
@@ -757,7 +775,7 @@ export class Wallet {
     amountsNeeded.set(Asset.nativeIdentifier(), fee)
     for (const { amount, assetIdentifier } of receives) {
       const currentAmount = amountsNeeded.get(assetIdentifier) ?? BigInt(0)
-      amountsNeeded.set(Asset.nativeIdentifier(), amount + currentAmount)
+      amountsNeeded.set(assetIdentifier, amount + currentAmount)
     }
 
     for (const { asset, value } of burns) {
