@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { TRANSACTION_VERSION } from '@ironfish/rust-nodejs'
-import { BufferSet } from 'buffer-map'
+import { BufferMap, BufferSet } from 'buffer-map'
 import { Assert } from '../assert'
 import { Blockchain } from '../blockchain'
 import {
@@ -14,9 +14,13 @@ import {
 import { Spend } from '../primitives'
 import { Block, GENESIS_BLOCK_SEQUENCE } from '../primitives/block'
 import { BlockHeader, transactionCommitment } from '../primitives/blockheader'
+import { BurnDescription } from '../primitives/burnDescription'
+import { MintDescription } from '../primitives/mintDescription'
 import { Target } from '../primitives/target'
 import { Transaction } from '../primitives/transaction'
 import { IDatabaseTransaction } from '../storage'
+import { BlockchainUtils } from '../utils/blockchain'
+import { BufferUtils } from '../utils/buffer'
 import { WorkerPool } from '../workerPool'
 
 export class Verifier {
@@ -380,6 +384,18 @@ export class Verifier {
       seen.add(spend.nullifier)
     }
 
+    const supplyVerification = await this.verifyBlockAssetSupply(block, tx)
+    if (!supplyVerification.valid) {
+      return supplyVerification
+    }
+
+    for (const mint of block.mints()) {
+      const mintVerification = this.verifyMint(mint)
+      if (!mintVerification.valid) {
+        return mintVerification
+      }
+    }
+
     return { valid: true }
   }
 
@@ -438,38 +454,148 @@ export class Verifier {
       return { valid: true }
     })
   }
+
+  /**
+   * Basic verification of mints on a transaction.
+   */
+  verifyMint(mint: MintDescription): VerificationResult {
+    // Asset should have a human readable name
+    const name = BufferUtils.toHuman(mint.asset.name())
+    if (name === '') {
+      return { valid: false, reason: VerificationResultReason.INVALID_ASSET_NAME }
+    }
+
+    return { valid: true }
+  }
+
+  /**
+   * Verify that the mints and burns in a block do not exceed a min or max supply.
+   */
+  async verifyBlockAssetSupply(
+    block: Block,
+    tx?: IDatabaseTransaction,
+  ): Promise<VerificationResult> {
+    const existingSupplyMap = await BlockchainUtils.getAssetSupplies(
+      this.chain,
+      Array.from(block.mints()),
+      Array.from(block.burns()),
+      undefined,
+      tx,
+    )
+
+    // Verify each transaction leaves the supply map in a valid state
+    for (const transaction of block.transactions) {
+      const verification = this.verifyTransactionAssetSupply(existingSupplyMap, transaction)
+
+      if (verification.valid) {
+        Assert.isNotUndefined(verification.transactionSupplyDelta)
+        // If all mints and burns in this transaction are valid, we can update the
+        // existing supply map with the changed supplies
+        for (const [assetIdentifier, supplyDelta] of verification.transactionSupplyDelta) {
+          const existingSupply = existingSupplyMap.get(assetIdentifier) ?? BigInt(0)
+          existingSupplyMap.set(assetIdentifier, existingSupply + supplyDelta)
+        }
+      } else {
+        return verification
+      }
+    }
+
+    return { valid: true }
+  }
+
+  /**
+   * Verify that the mints and burns in a transaction do not exceed a min or max supply.
+   * This function takes an existing supply map to validate that the supply
+   * changes are valid in a greater context (for example a block, or the entire
+   * blockchain).
+   *
+   * In addition to the usual VerificationResult, this also returns a map of the
+   * asset identifier to the supply change in this transaction if the result is valid.
+   */
+  verifyTransactionAssetSupply(
+    existingSupplyMap: BufferMap<bigint>,
+    transaction: Transaction,
+  ): VerificationResult & { transactionSupplyDelta?: BufferMap<bigint> } {
+    // This map contains the supply change delta of the entire transaction so
+    // that we can validate the supply without mutating the existing supply.
+    const transactionSupplyDelta = new BufferMap<bigint>()
+
+    for (const mint of transaction.mints) {
+      const assetIdentifier = mint.asset.identifier()
+
+      // Check for the asset supply in the maps, or default to 0
+      const existingSupply = existingSupplyMap.get(assetIdentifier) ?? BigInt(0)
+      const existingSupplyDelta = transactionSupplyDelta.get(assetIdentifier) ?? BigInt(0)
+
+      const newSupplyDelta = existingSupplyDelta + mint.value
+      // TODO: Define this const somewhere or find if it exists elsewhere
+      if (existingSupply + newSupplyDelta > BigInt(256_970_400) * BigInt(1e8)) {
+        return { valid: false, reason: VerificationResultReason.MAX_ASSET_SUPPLY_EXCEEDED }
+      }
+
+      // This description's supply change leaves the supply in a valid
+      // state, so we can update the transaction supply delta map
+      transactionSupplyDelta.set(assetIdentifier, newSupplyDelta)
+    }
+
+    for (const burn of transaction.burns) {
+      // Check for the asset supply in the maps
+      const existingSupply = existingSupplyMap.get(burn.assetIdentifier)
+      const existingSupplyDelta = transactionSupplyDelta.get(burn.assetIdentifier) ?? BigInt(0)
+
+      // If existing supply is undefined, this asset does not exist and therefore cannot be burned
+      if (existingSupply === undefined) {
+        return { valid: false, reason: VerificationResultReason.INVALID_ASSET }
+      }
+
+      const newSupplyDelta = existingSupplyDelta - burn.value
+      if (existingSupply + newSupplyDelta < 0) {
+        return { valid: false, reason: VerificationResultReason.MIN_ASSET_SUPPLY_EXCEEDED }
+      }
+
+      // This description's supply change leaves the supply in a valid
+      // state, so we can update the transaction supply delta map
+      transactionSupplyDelta.set(burn.assetIdentifier, newSupplyDelta)
+    }
+
+    return { valid: true, transactionSupplyDelta }
+  }
 }
 
 export enum VerificationResultReason {
   BLOCK_TOO_OLD = 'Block timestamp is in past',
   DESERIALIZATION = 'Failed to deserialize',
   DOUBLE_SPEND = 'Double spend',
-  DUPLICATE = 'Duplicate',
+  DUPLICATE = 'Duplicate block',
   ERROR = 'Error',
-  GRAFFITI = 'Graffiti field is not 32 bytes in length',
   GOSSIPED_GENESIS_BLOCK = 'Peer gossiped its genesis block',
+  GRAFFITI = 'Graffiti field is not 32 bytes in length',
   HASH_NOT_MEET_TARGET = 'Hash does not meet target',
+  INVALID_ASSET = 'Asset does not exist',
+  INVALID_ASSET_NAME = 'Asset name is invalid',
   INVALID_GENESIS_BLOCK = 'Peer is using a different genesis block',
   INVALID_MINERS_FEE = "Miner's fee is incorrect",
-  INVALID_PARENT = 'Invalid_parent',
+  INVALID_PARENT = 'Invalid parent',
   INVALID_SPEND = 'Invalid spend',
   INVALID_TARGET = 'Invalid target',
+  INVALID_TRANSACTION_COMMITMENT = 'Transaction commitment does not match transactions',
   INVALID_TRANSACTION_FEE = 'Transaction fee is incorrect',
   INVALID_TRANSACTION_PROOF = 'Invalid transaction proof',
-  INVALID_TRANSACTION_COMMITMENT = 'Transaction commitment does not match transactions',
   INVALID_TRANSACTION_VERSION = 'Invalid transaction version',
+  MAX_ASSET_SUPPLY_EXCEEDED = 'Asset supply exceeds maximum',
   MAX_BLOCK_SIZE_EXCEEDED = 'Block size exceeds maximum',
   MAX_TRANSACTION_SIZE_EXCEEDED = 'Transaction size exceeds maximum',
   MINERS_FEE_EXPECTED = 'Miners fee expected',
-  NOTE_COMMITMENT = 'Note_commitment',
+  MIN_ASSET_SUPPLY_EXCEEDED = 'Asset supply cannot be lower than 0',
+  NOTE_COMMITMENT = 'Invalid note commitment',
   NOTE_COMMITMENT_SIZE_TOO_LARGE = 'Note commitment tree is smaller than referenced by the spend',
   ORPHAN = 'Block is an orphan',
-  PREV_HASH_NULL = 'Previous block hash is null',
   PREV_HASH_MISMATCH = 'Previous block hash does not match expected hash',
+  PREV_HASH_NULL = 'Previous block hash is null',
   SEQUENCE_OUT_OF_ORDER = 'Block sequence is out of order',
   TOO_FAR_IN_FUTURE = 'Timestamp is in future',
   TRANSACTION_EXPIRED = 'Transaction expired',
-  VERIFY_TRANSACTION = 'Verify_transaction',
+  VERIFY_TRANSACTION = 'Transaction verification failed',
 }
 
 /**

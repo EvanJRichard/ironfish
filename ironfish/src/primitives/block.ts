@@ -5,6 +5,8 @@
 import { zip } from 'lodash'
 import { Assert } from '../assert'
 import { BlockHeader, BlockHeaderSerde, SerializedBlockHeader } from './blockheader'
+import { BurnDescription } from './burnDescription'
+import { MintDescription } from './mintDescription'
 import { NoteEncrypted, NoteEncryptedHash } from './noteEncrypted'
 import { Nullifier } from './nullifier'
 import { SerializedTransaction, Transaction } from './transaction'
@@ -74,6 +76,28 @@ export class Block {
     for (const transaction of this.transactions) {
       for (const note of transaction.notes) {
         yield note
+      }
+    }
+  }
+
+  /**
+   * Get a list of all mints on transactions in this block.
+   */
+  *mints(): Generator<MintDescription> {
+    for (const transaction of this.transactions) {
+      for (const mint of transaction.mints) {
+        yield mint
+      }
+    }
+  }
+
+  /**
+   * Get a list of all burns on transactions in this block.
+   */
+  *burns(): Generator<BurnDescription> {
+    for (const transaction of this.transactions) {
+      for (const burn of transaction.burns) {
+        yield burn
       }
     }
   }

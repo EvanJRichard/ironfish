@@ -774,7 +774,7 @@ export class Blockchain {
     const oldHead = this.head
     Assert.isNotNull(oldHead, 'No genesis block with fork')
 
-    // Step 0: Find the fork between the two heads
+    // Step 1: Find the fork between the two heads
     const fork = await this.findFork(oldHead, newHead, tx)
 
     // Step 2: Collect all the blocks from the old head to the fork
@@ -795,7 +795,7 @@ export class Blockchain {
       await this.disconnect(block, tx)
     }
 
-    // Step 3. Collect all the blocks from the fork to the new head
+    // Step 4. Collect all the blocks from the fork to the new head
     const addIter = this.iterateFrom(newHead, fork, tx)
     const addHeaders = await AsyncUtils.materialize(addIter)
     const addBlocks = await Promise.all(
@@ -809,7 +809,7 @@ export class Blockchain {
         }),
     )
 
-    // Step 4. Add the new blocks to the trees
+    // Step 5. Add the new blocks to the trees
     for (const block of addBlocks) {
       await this.reconnect(block, tx)
     }

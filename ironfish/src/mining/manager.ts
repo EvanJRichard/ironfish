@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { BufferSet } from 'buffer-map'
+import { BufferMap, BufferSet } from 'buffer-map'
 import { Assert } from '../assert'
 import { Blockchain } from '../blockchain'
 import { Event } from '../event'
@@ -20,6 +20,7 @@ import { Transaction } from '../primitives/transaction'
 import { BlockTemplateSerde, SerializedBlockTemplate } from '../serde'
 import { AsyncUtils } from '../utils/async'
 import { BenchUtils } from '../utils/bench'
+import { BlockchainUtils } from '../utils/blockchain'
 import { GraffitiUtils } from '../utils/graffiti'
 
 export enum MINED_RESULT {
@@ -74,6 +75,7 @@ export class MiningManager {
     // Fetch pending transactions
     const blockTransactions: Transaction[] = []
     const nullifiers = new BufferSet()
+    let existingSupplyMap = new BufferMap<bigint>()
     for (const transaction of this.memPool.orderedTransactions()) {
       // Skip transactions that would cause the block to exceed the max size
       const transactionSize = getTransactionSize(transaction)
@@ -103,6 +105,34 @@ export class MiningManager {
 
       for (const spend of transaction.spends) {
         nullifiers.add(spend.nullifier)
+      }
+
+      existingSupplyMap = await BlockchainUtils.getAssetSupplies(
+        this.chain,
+        transaction.mints,
+        transaction.burns,
+        existingSupplyMap,
+      )
+
+      // Verify the supply changes in this transaction are valid and if it is
+      // valid, update the existing supply map
+      const supplyVerification = this.chain.verifier.verifyTransactionAssetSupply(
+        existingSupplyMap,
+        transaction,
+      )
+      if (supplyVerification.valid) {
+        Assert.isNotUndefined(supplyVerification.transactionSupplyDelta)
+        // If all mints and burns in this transaction are valid, we can update the
+        // existing supply map with the changed supplies
+        for (const [
+          assetIdentifier,
+          supplyDelta,
+        ] of supplyVerification.transactionSupplyDelta) {
+          const existingSupply = existingSupplyMap.get(assetIdentifier) ?? BigInt(0)
+          existingSupplyMap.set(assetIdentifier, existingSupply + supplyDelta)
+        }
+      } else {
+        continue
       }
 
       currBlockSize += transactionSize
