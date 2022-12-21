@@ -219,13 +219,12 @@ function serializeMasp(data: GetTransactionStreamResponse): ApiMaspUpload {
           tx.notes
             .filter((note) => note.assetId !== Asset.nativeIdentifier().toString())
             .map((transfer) => ({
-              type: 'MASP_BURN' as MaspTransactionTypes,
+              type: 'MASP_TRANSFER' as MaspTransactionTypes,
               assetName: transfer.assetName,
             })),
         )
       return {
         ...tx,
-        hash: tx.hash,
         masps: masps,
       }
     }),

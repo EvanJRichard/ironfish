@@ -210,11 +210,11 @@ router.register<typeof GetTransactionStreamRequestSchema, GetTransactionStreamRe
       })
     }
 
-    const validatedAssetValue = async (identifier: Buffer): Promise<AssetsValue> => {
-      const assetValue = await node.chain.assets.get(identifier)
+    const validatedAssetValue = async (assetIdentifier: Buffer): Promise<AssetsValue> => {
+      const assetValue = await node.chain.assets.get(assetIdentifier)
       if (!assetValue) {
         throw new ValidationError(
-          `Asset detected in chain is not in assetDB. Asset Identifier: ${identifier.toString()}`,
+          `Asset detected in chain is not in assetDB. Asset Identifier: ${assetIdentifier.toString()}`,
         )
       }
       return assetValue
