@@ -20,6 +20,9 @@ pub const NATIVE_ASSET: AssetIdentifier = [
     253, 148, 34, 211, 177, 122, 246, 130, 58, 126, 106, 198,
 ];
 
+// The maximum amount that any individual mint or burn should contain.
+pub const MAX_ASSET_VALUE: u64 = 1_000_000_000_000_000_000; // 1e18
+
 // Uses the original value commitment generator as the native asset generator
 pub const NATIVE_ASSET_GENERATOR: SubgroupPoint = VALUE_COMMITMENT_VALUE_GENERATOR;
 

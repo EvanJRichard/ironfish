@@ -18,7 +18,7 @@ use jubjub::ExtendedPoint;
 use rand::thread_rng;
 
 use crate::{
-    assets::asset::{asset_generator_point, Asset},
+    assets::asset::{asset_generator_point, Asset, MAX_ASSET_VALUE},
     errors::IronfishError,
     sapling_bls12::SAPLING,
     serializing::read_point,
@@ -174,6 +174,7 @@ impl MintDescription {
     pub fn partial_verify(&self) -> Result<(), IronfishError> {
         self.verify_not_small_order()?;
         self.verify_generator_point()?;
+        self.verify_value()?;
 
         Ok(())
     }
@@ -189,6 +190,15 @@ impl MintDescription {
     /// Verify that the asset info hash maps to a valid generator point
     fn verify_generator_point(&self) -> Result<(), IronfishError> {
         asset_generator_point(&self.asset.asset_info_hashed)?;
+
+        Ok(())
+    }
+
+    /// Verify that the value of the mint is not greater than the limit
+    fn verify_value(&self) -> Result<(), IronfishError> {
+        if self.value > MAX_ASSET_VALUE {
+            return Err(IronfishError::InvalidBalance);
+        }
 
         Ok(())
     }

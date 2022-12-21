@@ -283,7 +283,7 @@ impl ProposedTransaction {
 
         let mut burn_descriptions = Vec::with_capacity(self.burns.len());
         for burn in &self.burns {
-            burn_descriptions.push(burn.build());
+            burn_descriptions.push(burn.build()?);
         }
 
         // Create the transaction signature hash
@@ -789,6 +789,10 @@ pub fn batch_verify_transactions<'a>(
                 &hash_to_verify_signature,
                 transaction.randomized_public_key(),
             )?;
+        }
+
+        for burn in transaction.burns.iter() {
+            burn.partial_verify()?;
         }
 
         transaction.verify_binding_signature(&binding_verification_key)?;

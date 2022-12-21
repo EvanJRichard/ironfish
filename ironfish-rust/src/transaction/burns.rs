@@ -7,7 +7,10 @@ use std::io;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use ironfish_zkp::constants::ASSET_IDENTIFIER_LENGTH;
 
-use crate::{assets::asset::AssetIdentifier, errors::IronfishError};
+use crate::{
+    assets::asset::{AssetIdentifier, MAX_ASSET_VALUE},
+    errors::IronfishError,
+};
 
 /// Parameters used to build a burn description
 pub struct BurnBuilder {
@@ -26,11 +29,15 @@ impl BurnBuilder {
         }
     }
 
-    pub fn build(&self) -> BurnDescription {
-        BurnDescription {
+    pub fn build(&self) -> Result<BurnDescription, IronfishError> {
+        let burn = BurnDescription {
             asset_identifier: self.asset_identifier,
             value: self.value,
-        }
+        };
+
+        burn.partial_verify()?;
+
+        Ok(burn)
     }
 }
 
@@ -46,6 +53,24 @@ pub struct BurnDescription {
 }
 
 impl BurnDescription {
+    /// This function handles the verification logic. The name is unclear on
+    /// burns since they have no proof, but wanted to keep it consistent with
+    /// the others until it's abstracted into a trait.
+    pub fn partial_verify(&self) -> Result<(), IronfishError> {
+        self.verify_value()?;
+
+        Ok(())
+    }
+
+    /// Verify that the value of the burn is not greater than the limit
+    fn verify_value(&self) -> Result<(), IronfishError> {
+        if self.value > MAX_ASSET_VALUE {
+            return Err(IronfishError::InvalidBalance);
+        }
+
+        Ok(())
+    }
+
     /// Write the signature of this proof to the provided writer.
     ///
     /// The signature is used by the transaction to calculate the signature
@@ -85,7 +110,11 @@ impl BurnDescription {
 
 #[cfg(test)]
 mod test {
-    use crate::{assets::asset::Asset, transaction::burns::BurnDescription, SaplingKey};
+    use crate::{
+        assets::asset::{Asset, MAX_ASSET_VALUE},
+        transaction::burns::BurnDescription,
+        SaplingKey,
+    };
 
     use super::BurnBuilder;
 
@@ -97,12 +126,38 @@ mod test {
         let metadata = "{ 'token_identifier': '0x123' }";
 
         let asset = Asset::new(owner, name, metadata).unwrap();
-        let value = 5;
+        let value = MAX_ASSET_VALUE;
 
         let builder = BurnBuilder::new(asset.identifier, value);
 
         assert_eq!(builder.value, value);
         assert_eq!(builder.asset_identifier, asset.identifier);
+
+        let burn = builder
+            .build()
+            .expect("should be able to build a burn description");
+
+        assert_eq!(burn.value, value);
+        assert_eq!(burn.asset_identifier, asset.identifier);
+    }
+
+    #[test]
+    fn test_burn_builder_invalid_value() {
+        let key = SaplingKey::generate_key();
+        let owner = key.public_address();
+        let name = "name";
+        let metadata = "{ 'token_identifier': '0x123' }";
+
+        let asset = Asset::new(owner, name, metadata).unwrap();
+        let value = MAX_ASSET_VALUE + 1;
+
+        let builder = BurnBuilder::new(asset.identifier, value);
+
+        assert_eq!(builder.value, value);
+        assert_eq!(builder.asset_identifier, asset.identifier);
+
+        let burn = builder.build();
+        assert!(burn.is_err());
     }
 
     #[test]
@@ -116,7 +171,9 @@ mod test {
         let value = 5;
 
         let builder = BurnBuilder::new(asset.identifier, value);
-        let burn = builder.build();
+        let burn = builder
+            .build()
+            .expect("should be able to build a burn description");
 
         let mut serialized_description = vec![];
         burn.write(&mut serialized_description)
