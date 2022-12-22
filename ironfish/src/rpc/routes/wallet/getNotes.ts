@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import * as yup from 'yup'
 import { Assert } from '../../../assert'
+import { CurrencyUtils } from '../../../utils'
 import { ApiNamespace, router } from '../router'
 import { getAccount } from './utils'
 
@@ -49,7 +50,7 @@ router.register<typeof GetAccountNotesStreamRequestSchema, GetAccountNotesStream
       Assert.isNotUndefined(transaction)
 
       request.stream({
-        amount: note.value().toString(),
+        amount: CurrencyUtils.encode(note.value()),
         memo: note.memo(),
         sender: note.sender(),
         transactionHash: transaction.transaction.hash().toString('hex'),
